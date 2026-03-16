@@ -255,7 +255,13 @@ func (al *AgentLoop) HardAbort(sessionKey string) error {
 		"initial_history_length": ts.initialHistoryLength,
 	})
 
-	// Rollback session history to the state before this turn started
+	// IMPORTANT: Trigger cascading cancellation FIRST to stop all child SubTurns
+	// from adding more messages to the session. This prevents race conditions
+	// where rollback happens while children are still writing.
+	ts.Finish()
+
+	// Rollback session history to the state before this turn started.
+	// This must happen AFTER Finish() to ensure no child turns are still writing.
 	if ts.session != nil {
 		currentHistory := ts.session.GetHistory("")
 		if len(currentHistory) > ts.initialHistoryLength {
@@ -267,9 +273,6 @@ func (al *AgentLoop) HardAbort(sessionKey string) error {
 			ts.session.SetHistory("", currentHistory[:ts.initialHistoryLength])
 		}
 	}
-
-	// Trigger cascading cancellation to all child SubTurns
-	ts.Finish()
 
 	return nil
 }

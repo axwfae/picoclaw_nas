@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/sipeed/picoclaw/pkg/providers"
 	"github.com/sipeed/picoclaw/pkg/session"
@@ -14,8 +13,8 @@ import (
 
 // ====================== Config & Constants ======================
 const (
-	maxSubTurnDepth        = 3
-	maxConcurrentSubTurns  = 5
+	maxSubTurnDepth       = 3
+	maxConcurrentSubTurns = 5
 )
 
 var (
@@ -78,20 +77,19 @@ type turnState struct {
 	turnID               string
 	parentTurnID         string
 	depth                int
-	childTurnIDs         []string
+	childTurnIDs         []string // MUST be accessed under mu lock or maybe add a getter method
 	pendingResults       chan *tools.ToolResult
 	session              session.SessionStore
-	initialHistoryLength int  // Snapshot of session history length at turn start, for rollback on hard abort
+	initialHistoryLength int // Snapshot of session history length at turn start, for rollback on hard abort
 	mu                   sync.Mutex
-	isFinished           bool // Marks if the parent Turn has ended
+	isFinished           bool          // MUST be accessed under mu lock
 	concurrencySem       chan struct{} // Limits concurrent child sub-turns
 }
 
 // ====================== Helper Functions ======================
-var globalTurnCounter int64
 
-func generateTurnID() string {
-	return fmt.Sprintf("subturn-%d", atomic.AddInt64(&globalTurnCounter, 1))
+func (al *AgentLoop) generateSubTurnID() string {
+	return fmt.Sprintf("subturn-%d", al.subTurnCounter.Add(1))
 }
 
 func newTurnState(ctx context.Context, id string, parent *turnState) *turnState {
@@ -113,12 +111,26 @@ func newTurnState(ctx context.Context, id string, parent *turnState) *turnState 
 }
 
 // Finish marks the turn as finished and cancels its context, aborting any running sub-turns.
+// It also closes the pendingResults channel to signal that no more results will be delivered.
 func (ts *turnState) Finish() {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
+
+	if ts.isFinished {
+		// Already finished - avoid double close of channel
+		return
+	}
+
 	ts.isFinished = true
+
 	if ts.cancelFunc != nil {
 		ts.cancelFunc()
+	}
+
+	// Close the pendingResults channel to signal no more results will arrive.
+	// This prevents goroutine leaks from readers waiting on the channel.
+	if ts.pendingResults != nil {
+		close(ts.pendingResults)
 	}
 }
 
@@ -186,6 +198,24 @@ func newEphemeralSession(_ session.SessionStore) session.SessionStore {
 
 // ====================== Core Function: spawnSubTurn ======================
 func spawnSubTurn(ctx context.Context, al *AgentLoop, parentTS *turnState, cfg SubTurnConfig) (result *tools.ToolResult, err error) {
+	// 0. Acquire concurrency semaphore FIRST to ensure it's released even if early validation fails.
+	// Blocks if parent already has maxConcurrentSubTurns running.
+	// Also respects context cancellation so we don't block forever if parent is aborted.
+	var semAcquired bool
+	if parentTS.concurrencySem != nil {
+		select {
+		case parentTS.concurrencySem <- struct{}{}:
+			semAcquired = true
+			defer func() {
+				if semAcquired {
+					<-parentTS.concurrencySem
+				}
+			}()
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
 	// 1. Depth limit check
 	if parentTS.depth >= maxSubTurnDepth {
 		return nil, ErrDepthLimitExceeded
@@ -196,42 +226,31 @@ func spawnSubTurn(ctx context.Context, al *AgentLoop, parentTS *turnState, cfg S
 		return nil, ErrInvalidSubTurnConfig
 	}
 
-	// 3. Acquire concurrency semaphore — blocks if parent already has maxConcurrentSubTurns running.
-	// Also respects context cancellation so we don't block forever if parent is aborted.
-	if parentTS.concurrencySem != nil {
-		select {
-		case parentTS.concurrencySem <- struct{}{}:
-			defer func() { <-parentTS.concurrencySem }()
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
-
 	// Create a sub-context for the child turn to support cancellation
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// 4. Create child Turn state
-	childID := generateTurnID()
+	// 3. Create child Turn state
+	childID := al.generateSubTurnID()
 	childTS := newTurnState(childCtx, childID, parentTS)
 
-	// 5. Establish parent-child relationship (thread-safe)
+	// 4. Establish parent-child relationship (thread-safe)
 	parentTS.mu.Lock()
 	parentTS.childTurnIDs = append(parentTS.childTurnIDs, childID)
 	parentTS.mu.Unlock()
 
-	// 6. Register the parent's pendingResults channel so the parent loop can poll it
+	// 5. Register the parent's pendingResults channel so the parent loop can poll it
 	al.registerSubTurnResultChannel(parentTS.turnID, parentTS.pendingResults)
 	defer al.unregisterSubTurnResultChannel(parentTS.turnID)
 
-	// 7. Emit Spawn event (currently using Mock, will be replaced by real EventBus)
+	// 6. Emit Spawn event (currently using Mock, will be replaced by real EventBus)
 	MockEventBus.Emit(SubTurnSpawnEvent{
 		ParentID: parentTS.turnID,
 		ChildID:  childID,
 		Config:   cfg,
 	})
 
-	// 8. Defer emitting End event, and recover from panics to ensure it's always fired
+	// 7. Defer emitting End event, and recover from panics to ensure it's always fired
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("subturn panicked: %v", r)
@@ -244,11 +263,11 @@ func spawnSubTurn(ctx context.Context, al *AgentLoop, parentTS *turnState, cfg S
 		})
 	}()
 
-	// 9. Execute sub-turn via the real agent loop.
+	// 8. Execute sub-turn via the real agent loop.
 	// Build a child AgentInstance from SubTurnConfig, inheriting defaults from the parent agent.
 	result, err = runTurn(childCtx, al, childTS, cfg)
 
-	// 10. Deliver result back to parent Turn
+	// 9. Deliver result back to parent Turn
 	deliverSubTurnResult(parentTS, childID, result)
 
 	return result, err
@@ -256,8 +275,11 @@ func spawnSubTurn(ctx context.Context, al *AgentLoop, parentTS *turnState, cfg S
 
 // ====================== Result Delivery ======================
 func deliverSubTurnResult(parentTS *turnState, childID string, result *tools.ToolResult) {
+	// Check parent state under lock, but don't hold lock while sending to channel
 	parentTS.mu.Lock()
-	defer parentTS.mu.Unlock()
+	isFinished := parentTS.isFinished
+	resultChan := parentTS.pendingResults
+	parentTS.mu.Unlock()
 
 	// Emit ResultDelivered event
 	MockEventBus.Emit(SubTurnResultDeliveredEvent{
@@ -266,10 +288,24 @@ func deliverSubTurnResult(parentTS *turnState, childID string, result *tools.Too
 		Result:   result,
 	})
 
-	if !parentTS.isFinished {
+	if !isFinished && resultChan != nil {
 		// Parent Turn is still running → Place in pending queue (handled automatically by parent loop in next round)
+		// Use defer/recover to handle the case where the channel is closed between our check and the send.
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was closed - treat as orphan result
+				if result != nil {
+					MockEventBus.Emit(SubTurnOrphanResultEvent{
+						ParentID: parentTS.turnID,
+						ChildID:  childID,
+						Result:   result,
+					})
+				}
+			}
+		}()
+
 		select {
-		case parentTS.pendingResults <- result:
+		case resultChan <- result:
 		default:
 			fmt.Println("[SubTurn] warning: pendingResults channel full")
 		}

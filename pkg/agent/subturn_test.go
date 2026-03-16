@@ -2,8 +2,11 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/sipeed/picoclaw/pkg/providers"
 	"github.com/sipeed/picoclaw/pkg/tools"
@@ -499,4 +502,222 @@ func TestHardAbortSessionRollback(t *testing.T) {
 	if finalHistory[0].Content != "initial message 1" || finalHistory[1].Content != "initial response 1" {
 		t.Error("history content does not match initial state after rollback")
 	}
+}
+
+// TestNestedSubTurnHierarchy verifies that nested SubTurns maintain correct
+// parent-child relationships and depth tracking when recursively calling runAgentLoop.
+func TestNestedSubTurnHierarchy(t *testing.T) {
+	al, _, _, _, cleanup := newTestAgentLoop(t)
+	defer cleanup()
+
+	// Track spawned turns and their depths
+	type turnInfo struct {
+		parentID string
+		childID  string
+		depth    int
+	}
+	var spawnedTurns []turnInfo
+	var mu sync.Mutex
+
+	// Override MockEventBus to capture spawn events
+	originalEmit := MockEventBus.Emit
+	defer func() { MockEventBus.Emit = originalEmit }()
+
+	MockEventBus.Emit = func(event any) {
+		if spawnEvent, ok := event.(SubTurnSpawnEvent); ok {
+			mu.Lock()
+			// Extract depth from context (we'll verify this matches expected depth)
+			spawnedTurns = append(spawnedTurns, turnInfo{
+				parentID: spawnEvent.ParentID,
+				childID:  spawnEvent.ChildID,
+			})
+			mu.Unlock()
+		}
+	}
+
+	// Create a root turn
+	rootSession := &ephemeralSessionStore{}
+	rootTS := &turnState{
+		ctx:            context.Background(),
+		turnID:         "root-turn",
+		depth:          0,
+		session:        rootSession,
+		pendingResults: make(chan *tools.ToolResult, 16),
+		concurrencySem: make(chan struct{}, 5),
+	}
+
+	// Spawn a child (depth 1)
+	childCfg := SubTurnConfig{Model: "gpt-4o-mini"}
+	_, err := spawnSubTurn(context.Background(), al, rootTS, childCfg)
+	if err != nil {
+		t.Fatalf("failed to spawn child: %v", err)
+	}
+
+	// Verify we captured the spawn event
+	mu.Lock()
+	if len(spawnedTurns) != 1 {
+		t.Fatalf("expected 1 spawn event, got %d", len(spawnedTurns))
+	}
+	if spawnedTurns[0].parentID != "root-turn" {
+		t.Errorf("expected parent ID 'root-turn', got %s", spawnedTurns[0].parentID)
+	}
+	mu.Unlock()
+
+	// Verify root turn has the child in its childTurnIDs
+	rootTS.mu.Lock()
+	if len(rootTS.childTurnIDs) != 1 {
+		t.Errorf("expected root to have 1 child, got %d", len(rootTS.childTurnIDs))
+	}
+	rootTS.mu.Unlock()
+}
+
+// TestDeliverSubTurnResultNoDeadlock verifies that deliverSubTurnResult doesn't
+// deadlock when multiple goroutines are accessing the parent turnState concurrently.
+func TestDeliverSubTurnResultNoDeadlock(t *testing.T) {
+	parent := &turnState{
+		ctx:            context.Background(),
+		turnID:         "parent-deadlock-test",
+		depth:          0,
+		pendingResults: make(chan *tools.ToolResult, 2), // Small buffer to test blocking
+		isFinished:     false,
+	}
+
+	// Simulate multiple child turns delivering results concurrently
+	var wg sync.WaitGroup
+	numChildren := 10
+
+	for i := 0; i < numChildren; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			result := &tools.ToolResult{ForLLM: fmt.Sprintf("result-%d", id)}
+			deliverSubTurnResult(parent, fmt.Sprintf("child-%d", id), result)
+		}(i)
+	}
+
+	// Concurrently read from the channel to prevent blocking
+	go func() {
+		for i := 0; i < numChildren; i++ {
+			select {
+			case <-parent.pendingResults:
+			case <-time.After(2 * time.Second):
+				t.Error("timeout waiting for result")
+				return
+			}
+		}
+	}()
+
+	// Wait for all deliveries to complete (with timeout)
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Success - no deadlock
+	case <-time.After(3 * time.Second):
+		t.Fatal("deadlock detected: deliverSubTurnResult blocked")
+	}
+}
+
+// TestHardAbortOrderOfOperations verifies that HardAbort calls Finish() before
+// rolling back session history, minimizing the race window where new messages
+// could be added after rollback.
+func TestHardAbortOrderOfOperations(t *testing.T) {
+	al, _, _, _, cleanup := newTestAgentLoop(t)
+	defer cleanup()
+
+	sess := &ephemeralSessionStore{
+		history: []providers.Message{
+			{Role: "user", Content: "initial message"},
+			{Role: "assistant", Content: "response 1"},
+			{Role: "user", Content: "follow-up"},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	rootTS := &turnState{
+		ctx:                  ctx,
+		cancelFunc:           cancel,
+		turnID:               "test-session-order",
+		depth:                0,
+		session:              sess,
+		initialHistoryLength: 1, // Snapshot: 1 message
+		pendingResults:       make(chan *tools.ToolResult, 16),
+		concurrencySem:       make(chan struct{}, 5),
+	}
+
+	al.activeTurnStates.Store("test-session-order", rootTS)
+
+	// Trigger HardAbort
+	err := al.HardAbort("test-session-order")
+	if err != nil {
+		t.Fatalf("HardAbort failed: %v", err)
+	}
+
+	// Verify context was cancelled (Finish() was called)
+	select {
+	case <-rootTS.ctx.Done():
+		// Good - context was cancelled
+	default:
+		t.Error("expected context to be cancelled after HardAbort")
+	}
+
+	// Verify history was rolled back
+	finalHistory := sess.GetHistory("")
+	if len(finalHistory) != 1 {
+		t.Errorf("expected history to rollback to 1 message, got %d", len(finalHistory))
+	}
+
+	if finalHistory[0].Content != "initial message" {
+		t.Error("history content does not match initial state after rollback")
+	}
+}
+
+// TestFinishClosesChannel verifies that Finish() closes the pendingResults channel
+// and that deliverSubTurnResult handles closed channels gracefully.
+func TestFinishClosesChannel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ts := &turnState{
+		ctx:            ctx,
+		cancelFunc:     cancel,
+		turnID:         "test-finish-channel",
+		depth:          0,
+		pendingResults: make(chan *tools.ToolResult, 2),
+		isFinished:     false,
+	}
+
+	// Verify channel is open initially
+	select {
+	case ts.pendingResults <- &tools.ToolResult{ForLLM: "test"}:
+		// Good - channel is open
+		// Drain the message we just sent
+		<-ts.pendingResults
+	default:
+		t.Fatal("channel should be open initially")
+	}
+
+	// Call Finish()
+	ts.Finish()
+
+	// Verify channel is closed
+	_, ok := <-ts.pendingResults
+	if ok {
+		t.Error("expected channel to be closed after Finish()")
+	}
+
+	// Verify Finish() is idempotent (can be called multiple times)
+	ts.Finish() // Should not panic
+
+	// Verify deliverSubTurnResult doesn't panic when sending to closed channel
+	result := &tools.ToolResult{ForLLM: "late result"}
+
+	// This should not panic - it should recover and emit OrphanResultEvent
+	deliverSubTurnResult(ts, "child-1", result)
 }

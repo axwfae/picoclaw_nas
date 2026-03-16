@@ -36,21 +36,22 @@ import (
 )
 
 type AgentLoop struct {
-	bus            *bus.MessageBus
-	cfg            *config.Config
-	registry       *AgentRegistry
-	state          *state.Manager
-	running        atomic.Bool
-	summarizing    sync.Map
-	fallback       *providers.FallbackChain
-	channelManager *channels.Manager
-	mediaStore     media.MediaStore
-	transcriber    voice.Transcriber
-	cmdRegistry    *commands.Registry
-	mcp            mcpRuntime
+	bus              *bus.MessageBus
+	cfg              *config.Config
+	registry         *AgentRegistry
+	state            *state.Manager
+	running          atomic.Bool
+	summarizing      sync.Map
+	fallback         *providers.FallbackChain
+	channelManager   *channels.Manager
+	mediaStore       media.MediaStore
+	transcriber      voice.Transcriber
+	cmdRegistry      *commands.Registry
+	mcp              mcpRuntime
 	steering         *steeringQueue
 	subTurnResults   sync.Map // key: sessionKey (string), value: chan *tools.ToolResult
 	activeTurnStates sync.Map // key: sessionKey (string), value: *turnState
+	subTurnCounter   atomic.Int64 // Counter for generating unique SubTurn IDs
 	mu               sync.RWMutex
 	// Track active requests for safe provider cleanup
 	activeRequests sync.WaitGroup
@@ -964,25 +965,39 @@ func (al *AgentLoop) runAgentLoop(
 	agent *AgentInstance,
 	opts processOptions,
 ) (string, error) {
-	// Initialize a root TurnState for this iteration, allowing sub-turns to be spawned.
-	rootTS := &turnState{
-		ctx:                  ctx,
-		turnID:               opts.SessionKey, // Associate this turn graph with the current session key
-		depth:                0,
-		session:              agent.Sessions,
-		initialHistoryLength: len(agent.Sessions.GetHistory("")), // Snapshot for rollback on hard abort
-		pendingResults:       make(chan *tools.ToolResult, 16),
-		concurrencySem:       make(chan struct{}, 5), // maxConcurrentSubTurns
+	// Check if we're already inside a SubTurn (context already has a turnState).
+	// If so, reuse it instead of creating a new root turnState.
+	// This prevents turnState hierarchy corruption when SubTurns recursively call runAgentLoop.
+	existingTS := turnStateFromContext(ctx)
+	var rootTS *turnState
+	var isRootTurn bool
+
+	if existingTS != nil {
+		// We're inside a SubTurn — reuse the existing turnState
+		rootTS = existingTS
+		isRootTurn = false
+	} else {
+		// This is a top-level turn — initialize a new root TurnState
+		rootTS = &turnState{
+			ctx:                  ctx,
+			turnID:               opts.SessionKey, // Associate this turn graph with the current session key
+			depth:                0,
+			session:              agent.Sessions,
+			initialHistoryLength: len(agent.Sessions.GetHistory("")), // Snapshot for rollback on hard abort
+			pendingResults:       make(chan *tools.ToolResult, 16),
+			concurrencySem:       make(chan struct{}, 5), // maxConcurrentSubTurns
+		}
+		ctx = withTurnState(ctx, rootTS)
+		isRootTurn = true
+
+		// Register this root turn state so HardAbort can find it
+		al.activeTurnStates.Store(opts.SessionKey, rootTS)
+		defer al.activeTurnStates.Delete(opts.SessionKey)
+
+		// Ensure the parent's pending results channel is cleaned up when this root turn finishes
+		defer al.unregisterSubTurnResultChannel(rootTS.turnID)
+		al.registerSubTurnResultChannel(rootTS.turnID, rootTS.pendingResults)
 	}
-	ctx = withTurnState(ctx, rootTS)
-
-	// Register this root turn state so HardAbort can find it
-	al.activeTurnStates.Store(opts.SessionKey, rootTS)
-	defer al.activeTurnStates.Delete(opts.SessionKey)
-
-	// Ensure the parent's pending results channel is cleaned up when this root turn finishes
-	defer al.unregisterSubTurnResultChannel(rootTS.turnID)
-	al.registerSubTurnResultChannel(rootTS.turnID, rootTS.pendingResults)
 
 	// 0. Record last channel for heartbeat notifications (skip internal channels and cli)
 	if opts.Channel != "" && opts.ChatID != "" {
@@ -1028,8 +1043,11 @@ func (al *AgentLoop) runAgentLoop(
 		return "", err
 	}
 
-	// Signal completion to rootTS so it knows it is finished, terminating any active sub-turns
-	rootTS.Finish()
+	// Signal completion to rootTS so it knows it is finished, terminating any active sub-turns.
+	// Only call Finish() if this is a root turn (not a SubTurn recursively calling runAgentLoop).
+	if isRootTurn {
+		rootTS.Finish()
+	}
 
 	// If last tool had ForUser content and we already sent it, we might not need to send final response
 	// This is controlled by the tool's Silent flag and ForUser content
