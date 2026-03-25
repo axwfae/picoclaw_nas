@@ -1,0 +1,62 @@
+# ============================================================
+# Stage 2: Build for https://github.com/sipeed/picoclaw
+# ============================================================
+ARG BASE_TAG=launcher
+FROM sipeed/picoclaw:${BASE_TAG} AS docker_base
+
+# ============================================================
+# Stage 3: Runtime image
+# ============================================================
+FROM debian:bookworm-slim
+
+RUN apt-get update 
+
+# ============================================================
+RUN apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+    curl \
+    unzip \
+    wget
+
+# ============================================================
+RUN apt-get install -y --no-install-recommends \
+    git \
+    python3 
+
+# ============================================================
+RUN apt-get install -y --no-install-recommends \
+    procps \
+    cron \
+    jq 
+
+# ============================================================
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:18790/health || exit 1
+
+# Copy binaries from builder
+COPY --from=docker_base /usr/local/bin/picoclaw              /usr/local/bin/picoclaw
+COPY --from=docker_base /usr/local/bin/picoclaw-launcher     /usr/local/bin/picoclaw-launcher
+COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/picoclaw-launcher-tui
+
+# Create non-root user and group
+#RUN groupadd -g 1000 picoclaw && \
+#    useradd -m -u 1000 -g picoclaw picoclaw
+#
+# Switch to non-root user
+#USER picoclaw
+
+# Run onboard to create initial directories and config
+#RUN /usr/local/bin/picoclaw onboard
+
+# Default to launcher mode (web console + gateway)
+#ENTRYPOINT ["picoclaw-launcher"]
+#CMD ["-public", "-no-browser"]
+
+COPY docker/my_app /my_app
+RUN chmod +x /my_app/entrypoint.sh
+
+ENTRYPOINT ["/my_app/entrypoint.sh"]
