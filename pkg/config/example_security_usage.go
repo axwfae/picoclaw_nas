@@ -104,30 +104,30 @@ Note: Sensitive fields are omitted because they're loaded from .security.yml
 	  ],
 	  "channels": {
 	    "telegram": {
-	      "enabled": true"
+	      "enabled": true
 	      // token is automatically loaded from .security.yml
 	    },
 	    "discord": {
-	      "enabled": true"
+	      "enabled": true
 	      // token is automatically loaded from .security.yml
 	    }
 	  },
 	  "tools": {
 	    "web": {
 	      "brave": {
-	        "enabled": true"
+	        "enabled": true
 	        // api_key is automatically loaded from .security.yml
 	      },
 	      "tavily": {
-	        "enabled": true"
+	        "enabled": true
 	        // api_key is automatically loaded from .security.yml
 	      },
 	      "glm_search": {
-	        "enabled": true"
+	        "enabled": true
 	        // api_key is automatically loaded from .security.yml
 	      },
 	      "baidu_search": {
-	        "enabled": true"
+	        "enabled": true
 	        // api_key is automatically loaded from .security.yml
 	      }
 	    }
@@ -236,8 +236,6 @@ channels:
 	  password: "value"
 	  nickserv_password: "value"
 	  sasl_password: "value"
-
-```
 
 ## Web Tool API Keys
 
@@ -429,13 +427,13 @@ web:
 	  "tools": {
 	    "web": {
 	      "brave": {
-	        "enabled": true"
+	        "enabled": true
 	      },
 	      "tavily": {
-	        "enabled": true"
+	        "enabled": true
 	      },
 	      "glm_search": {
-	        "enabled": true"
+	        "enabled": true
 	      }
 	    }
 	  }
