@@ -1949,6 +1949,7 @@ turnLoop:
 
 			isContextError := !isTimeoutError && (strings.Contains(errMsg, "context_length_exceeded") ||
 				strings.Contains(errMsg, "context window") ||
+				strings.Contains(errMsg, "context_window") ||
 				strings.Contains(errMsg, "maximum context length") ||
 				strings.Contains(errMsg, "token limit") ||
 				strings.Contains(errMsg, "too many tokens") ||
