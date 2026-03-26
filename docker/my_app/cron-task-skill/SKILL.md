@@ -1,6 +1,6 @@
 ---
 name: cron-task-skill
-version: "2.1.0"
+version: "2.2.0"
 description: 定时任务调度器 - 使用 JSON 存储任务，支持 Shell 命令和 AI 模式，由系统 cron 每分钟触发执行
 metadata: {"nanobot":{"emoji":"⏰","requires":{"bins":["bash","cron","jq"]}}}
 ---
@@ -16,6 +16,32 @@ metadata: {"nanobot":{"emoji":"⏰","requires":{"bins":["bash","cron","jq"]}}}
 - 報告錯誤
 - 回滾變更
 - 不可假裝操作成功
+
+---
+
+## ⚠️ 核心原則：創建腳本必須使用工具
+
+> **重要**：「自動生成腳本」**必須**使用 `cron_create_script.sh` 工具，**禁止**手動創建！
+
+**原因**：
+- 手動創建容易忽略腳本命名規範（任務 ID 命名）
+- 手動創建容易忘記設置執行權限
+- 手動創建缺少任務 ID 存在性驗證
+
+**正確流程**：
+```bash
+# ✅ 使用工具（自動遵循所有規範）
+echo 'echo "任務內容"' | ./cron_create_script.sh "任務ID"
+
+# ❌ 禁止手動創建
+echo 'echo "任務內容"' > run_sh/custom_name.sh  # 錯誤！
+```
+
+工具會自動完成：
+- ✅ 驗證任務 ID 是否存在於 JSON
+- ✅ 使用任務 ID 自動命名腳本
+- ✅ 設置執行權限 755
+- ✅ 添加自動清理機制
 
 ---
 
@@ -232,22 +258,24 @@ rm -f /root/.picoclaw/workspace/cron_task/run_sh/<任務ID>.sh
 
 ### ⚡ 完整工作流程
 
-> ⚠️ **重要**：創建腳本後**必須**設置執行權限，否則任務會失敗！
+> ⚠️ **重要**：創建腳本**必須使用工具**，禁止手動創建！
 
 ```bash
-# 1. 創建腳本（放在 run_sh 目錄）- 方式 A：使用輔助腳本（推薦）
-echo "echo '執行特定功能...'" | ./cron_create_script.sh "1714426080-1234"
-# ✓ 自動驗證任務ID存在、自動設置權限、返回腳本路徑
-
-# 1. 創建腳本（放在 run_sh 目錄）- 方式 B：命令列參數
-./cron_create_script.sh "1714426080-1234" "echo '執行特定功能...'"
+# 1. 創建腳本（放在 run_sh 目錄）- 使用工具（✅ 強制要求）
+echo "echo '執行特定功能...'" | ./cron_create_script.sh "任務ID"
 # ✓ 自動驗證任務ID存在
+# ✓ 自動使用任務ID命名
+# ✓ 自動設置權限 755
+# ✓ 返回腳本路徑
+
+# ❌ 禁止手動創建
+echo "echo '執行特定功能...'" > run_sh/custom_name.sh  # 錯誤！
 
 # 2. 執行任務（腳本執行後會自動刪除自身）
-bash /root/.picoclaw/workspace/cron_task/run_sh/1714426080-1234.sh
+bash /root/.picoclaw/workspace/cron_task/run_sh/<任務ID>.sh
 
 # 3. 任務完成後清理（如腳本未自動清理）
-rm -f /root/.picoclaw/workspace/cron_task/run_sh/1714426080-1234.sh
+rm -f /root/.picoclaw/workspace/cron_task/run_sh/<任務ID>.sh
 ```
 
 > 📌 **常見錯誤**：`Permission denied` → 忘記執行 `chmod 755`
@@ -256,6 +284,7 @@ rm -f /root/.picoclaw/workspace/cron_task/run_sh/1714426080-1234.sh
 
 創建自動生成腳本時，請確認：
 
+- [ ] **使用 `cron_create_script.sh` 工具創建**（非手動）
 - [ ] 腳本名稱與 cron_task.json 中的任務 ID 完全一致
 - [ ] 腳本路徑在 `cron_task/run_sh/` 目錄下
 - [ ] 文件權限為 `755`（`chmod 755`）- **⚠️ 極易遺漏**
@@ -496,6 +525,12 @@ picoclaw 會調用相應的腳本完成任務操作。
 ---
 
 ## 版本歷史
+
+### v2.2.0 (2026-03-26)
+- ⚠️ **新增「創建腳本必須使用工具」核心原則**
+- 🔧 添加 `cron_create_script.sh` 為強制使用工具（非可選）
+- 📝 更新驗證清單，加入「腳本是否由工具創建」檢查
+- 🛡️ 防止手動創建導致的命名/權限/驗證問題
 
 ### v2.1.0 (2026-03-26)
 - ✨ 新增 Discord 通知集成說明
