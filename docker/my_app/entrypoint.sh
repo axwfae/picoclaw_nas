@@ -15,7 +15,7 @@ SRC_DISCORD_BOT_DIR="/my_app/discord-send"
 DISCORD_BOT_DIR="${WORKSPACE_DIR}/skills/discord-send"
 DISCORD_BOT_SCRIPTS_DIR="${DISCORD_BOT_DIR}/scripts"
 
-AGENT_ADD_CMD_DIR="/my_app/ AGENT_add_cmd.md"
+AGENT_ADD_CMD_DIR="/my_app/AGENT_add_cmd.md"
 
 # 首次运行：任一缺失则 onboarding
 if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
