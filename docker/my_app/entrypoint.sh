@@ -17,6 +17,8 @@ if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
     echo ""
     echo "First-run setup complete."
     echo "Edit ${PICOPATH}/config.json (add your API key, etc.) then restart the container."
+
+    echo AGENT_add_cmd.md >> "${WORKSPACE_DIR}/AGENT.md"
     exit 0
 fi
 
