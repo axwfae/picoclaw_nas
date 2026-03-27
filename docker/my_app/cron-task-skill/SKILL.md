@@ -1,11 +1,11 @@
 ---
 name: cron-task-skill
-version: "3.0.0"
+version: "3.2.0"
 description: 定时任务调度器 - 只有 2 个执行脚本，任务 CRUD 由 AI 直接操作 JSON
 metadata: {"nanobot":{"emoji":"⏰","requires":{"bins":["bash","cron","jq"]}}}
 ---
 
-# cron-task-skill - 定时任务调度器 (v3.0.0)
+# cron-task-skill - 定时任务调度器 (v3.2.0)
 
 极简设计：只有 2 个系统脚本，任务 CRUD 由 AI 直接操作 JSON。
 
@@ -41,14 +41,49 @@ metadata: {"nanobot":{"emoji":"⏰","requires":{"bins":["bash","cron","jq"]}}}
 ## 脚本命名规范（重要！）
 
 > ⚠️ **Shell 模式必须遵守的命名规则**：脚本文件名必须与任务 ID 一致，以便 `cron_cleanup.sh` 能够正确识别并清理孤立脚本。
+> ⚠️ **所有任务必须使用此格式**：任务 ID 格式为 `时间戳-任务简介`，例如 `1774624286-workspace_backup_0400.sh`
 
-### 命名规则
+### 格式规则
 
 ```
+任务ID = 时间戳 + "-" + 任务简介（不含.sh）
 脚本名 = 任务ID + ".sh"
-例如：
-  任务ID: 1774623540-1234
-  脚本名: 1774623540-1234.sh
+
+示例：
+  时间戳: 1774624286（当前时间戳）
+  任务简介: workspace_backup_0400
+  任务ID: 1774624286-workspace_backup_0400
+  脚本名: 1774624286-workspace_backup_0400.sh
+```
+
+### 正确示例
+
+```json
+{
+  "id": "1774624286-workspace_backup_0400",
+  "command": "bash /root/.picoclaw/workspace/cron_task/run_sh/1774624286-workspace_backup_0400.sh"
+}
+```
+
+```
+run_sh/
+└── 1774624286-workspace_backup_0400.sh  ← 任务ID + ".sh"
+```
+
+### 错误示例（不符合规范）
+
+```json
+{
+  "id": "workspace_backup_0400",  ❌ 缺少时间戳前缀
+  "command": "bash /root/.picoclaw/workspace/cron_task/run_sh/workspace_backup_0400.sh"
+}
+```
+
+```json
+{
+  "id": "1774624286-workspace_backup_0400.sh",  ❌ 包含了 .sh 后缀
+  "command": "bash /root/.picoclaw/workspace/cron_task/run_sh/1774624286-workspace_backup_0400.sh"
+}
 ```
 
 ### cron_cleanup.sh 工作原理
@@ -57,33 +92,6 @@ metadata: {"nanobot":{"emoji":"⏰","requires":{"bins":["bash","cron","jq"]}}}
 2. 检查 `run_sh/` 目录下每个 `.sh` 文件
 3. 如果脚本名（去掉 .sh 后缀）不在任务 ID 列表中 → 删除
 
-### 正确示例
-
-```json
-{
-  "id": "1774623540-1234",
-  "command": "bash /root/.picoclaw/workspace/cron_task/run_sh/1774623540-1234.sh"
-}
-```
-
-```
-run_sh/
-└── 1774623540-1234.sh  ← 与任务 ID 一致
-```
-
-### 错误示例（会导致孤立脚本无法清理）
-
-```json
-{
-  "id": "1774623540-1234",
-  "command": "bash /root/.picoclaw/workspace/cron_task/run_sh/backup.sh"
-}
-```
-
-```
-run_sh/
-└── backup.sh  ← 命名与 ID 无关，cron_cleanup.sh 无法识别！
-```
 
 ### 数据文件
 
@@ -107,13 +115,13 @@ run_sh/
 {
   "tasks": [
     {
-      "id": "时间戳-随机数",
+      "id": "时间戳-任务简介",
       "type": "interval",
       "name": "任务名称",
       "command": "ai:自然语言命令",
       "interval": 3600,
       "status": "active",
-      "created": 1773278400,
+      "created": 1774624286,
       "next_run": 1773282000,
       "last_run": null,
       "run_count": 0,
@@ -127,7 +135,7 @@ run_sh/
 
 | 字段 | 说明 | 示例 |
 |------|------|------|
-| `id` | 唯一标识 | `1773278400-1234` |
+| `id` | 唯一标识，格式：`时间戳-任务简介` | `1774624286-workspace_backup_0400` |
 | `type` | 类型 | `interval`(间隔) / `once`(一次性) / `cron`(Cron表达式) |
 | `name` | 任务名称 | `喝水提醒` |
 | `command` | 命令 | `ai:提醒我喝水` 或 `bash /path/to/script.sh` |
@@ -151,7 +159,7 @@ tasks=$(jq '.tasks' cron_task.json)
 
 # 构建新任务
 new_task='{
-  "id": "'$(date +%s)-$((RANDOM % 10000))'",
+  "id": "'$(date +%s)-drink_water_reminder'",
   "type": "interval",
   "name": "喝水提醒",
   "command": "ai:提醒我喝水",
@@ -182,27 +190,27 @@ jq -r '.tasks[] | "[\(.status)] \(.name) | \(.type) | 下次: \(.next_run | strf
 #### 删除任务
 
 ```
-用户: 删除任务 1773278400-1234
+用户: 删除任务 1774624286-drink_water_reminder
 ```
 
 AI 直接操作：
 ```bash
-jq --arg id "1773278400-1234" 'del(.tasks[] | select(.id == $id))' cron_task.json > tmp.json && mv tmp.json cron_task.json
+jq --arg id "1774624286-drink_water_reminder" 'del(.tasks[] | select(.id == $id))' cron_task.json > tmp.json && mv tmp.json cron_task.json
 ```
 
 #### 暂停/恢复任务
 
 ```
-用户: 暂停任务 1773278400-1234
+用户: 暂停任务 1774624286-drink_water_reminder
 ```
 
 AI 直接操作：
 ```bash
 # 暂停
-jq --arg id "1773278400-1234" '.tasks[] |= if .id == $id then .status = "paused" else . end' cron_task.json > tmp.json && mv tmp.json cron_task.json
+jq --arg id "1774624286-drink_water_reminder" '.tasks[] |= if .id == $id then .status = "paused" else . end' cron_task.json > tmp.json && mv tmp.json cron_task.json
 
 # 恢复
-jq --arg id "1773278400-1234" '.tasks[] |= if .id == $id then .status = "active" else . end' cron_task.json > tmp.json && mv tmp.json cron_task.json
+jq --arg id "1774624286-drink_water_reminder" '.tasks[] |= if .id == $id then .status = "active" else . end' cron_task.json > tmp.json && mv tmp.json cron_task.json
 ```
 
 ---
@@ -302,7 +310,7 @@ jq -r '.tasks[] | .id + " | " + .name + " | " + .status + " | " + (.next_run | t
 ```
 用户: 添加一个每小时提醒我喝水的任务
  Pico: ✓ 已添加任务
-       ID: 1773278400-1234
+       ID: 1774624286-drink_water_reminder
        类型: interval
        间隔: 3600秒
        模式: AI
@@ -312,7 +320,7 @@ jq -r '.tasks[] | .id + " | " + .name + " | " + .status + " | " + (.next_run | t
 
 用户: 添加一个每周三周五早上5-6点每12分钟的任务
  Pico: ✓ 已添加任务
-       ID: 1773278400-5678
+       ID: 1774624287-morning_task_5_6
        类型: cron
        表达式: */12 5-6 * * 3,5
        
@@ -323,13 +331,13 @@ jq -r '.tasks[] | .id + " | " + .name + " | " + .status + " | " + (.next_run | t
  1. [active] 喝水提醒 | interval | 下次: 03-26 23:00
  2. [active] 晨间任务 | cron | 下次: 03-26 05:00
 
-用户: 删除任务 1773278400-1234
- Pico: ✓ 已删除任务 1773278400-1234
+用户: 删除任务 1774624286-drink_water_reminder
+ Pico: ✓ 已删除任务 1774624286-drink_water_reminder
        
        验证: jq 通过 ✓
 
-用户: 暂停任务 1773278400-5678
- Pico: ✓ 已暂停任务 1773278400-5678
+用户: 暂停任务 1774624287-morning_task_5_6
+ Pico: ✓ 已暂停任务 1774624287-morning_task_5_6
        
        验证: jq 通过 ✓
 ```
@@ -375,6 +383,10 @@ jq --argjson task '{...}' '.tasks += [$task]' cron_task.json > tmp.json && mv tm
 ---
 
 ## 版本历史
+
+### v3.2.0 (2026-03-27)
+- 📋 新增：任务 ID 格式规范 `时间戳-任务简介`
+- ✏️ 更新：示例对话中的任务 ID 格式
 
 ### v3.1.0 (2026-03-27)
 - ⏱️ 优化：cron_cleanup.sh 改为每整点(:00)或半点(:30)执行一次
