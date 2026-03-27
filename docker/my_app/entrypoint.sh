@@ -11,9 +11,11 @@ CRON_RUN_SCRIPT="cron_run.sh"
 CRON_JOB_PATH="${CRON_SCRIPTS_DIR}/${CRON_RUN_SCRIPT}"
 CRON_LOG="/tmp/cron_task.log"
 
-SRC_DISCORD_BOT_DIR="/my_app/discrod-send"
-DISCORD_BOT_DIR="${WORKSPACE_DIR}/skills/discrod-send"
+SRC_DISCORD_BOT_DIR="/my_app/discord-send"
+DISCORD_BOT_DIR="${WORKSPACE_DIR}/skills/discord-send"
 DISCORD_BOT_SCRIPTS_DIR="${DISCORD_BOT_DIR}/scripts"
+
+AGENT_ADD_CMD_DIR="/my_app/ AGENT_add_cmd.md"
 
 # 首次运行：任一缺失则 onboarding
 if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
@@ -22,7 +24,7 @@ if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
     echo "First-run setup complete."
     echo "Edit ${PICOPATH}/config.json (add your API key, etc.) then restart the container."
 
-    cat AGENT_add_cmd.md >> "${WORKSPACE_DIR}/AGENT.md"
+    cat "${AGENT_ADD_CMD_DIR}" >> "${WORKSPACE_DIR}/AGENT.md"
     exit 0
 fi
 
