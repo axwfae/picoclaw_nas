@@ -11,6 +11,10 @@ CRON_RUN_SCRIPT="cron_run.sh"
 CRON_JOB_PATH="${CRON_SCRIPTS_DIR}/${CRON_RUN_SCRIPT}"
 CRON_LOG="/tmp/cron_task.log"
 
+SRC_DISCORD_BOT_DIR="/my_app/discrod-send"
+DISCORD_BOT_DIR="${WORKSPACE_DIR}/skills/discrod-send"
+DISCORD_BOT_SCRIPTS_DIR="${DISCORD_BOT_DIR}/scripts"
+
 # 首次运行：任一缺失则 onboarding
 if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
     picoclaw onboard
@@ -18,7 +22,7 @@ if [ ! -d "${WORKSPACE_DIR}" ] || [ ! -f "${PICOPATH}/config.json" ]; then
     echo "First-run setup complete."
     echo "Edit ${PICOPATH}/config.json (add your API key, etc.) then restart the container."
 
-    echo AGENT_add_cmd.md >> "${WORKSPACE_DIR}/AGENT.md"
+    cat AGENT_add_cmd.md >> "${WORKSPACE_DIR}/AGENT.md"
     exit 0
 fi
 
@@ -29,6 +33,17 @@ if [ ! -d "${CRON_DIR}" ]; then
     if [ -d "${CRON_SCRIPTS_DIR}" ]; then
         chmod 755 "${CRON_SCRIPTS_DIR}"/*.sh 2>/dev/null || true
         chmod 644 "${CRON_DIR}"/SKILL.md 2>/dev/null || true        
+    fi
+fi
+
+# 复制 discord-send（若不存在）
+if [ ! -d "${DISCORD_BOT_DIR}" ]; then
+    cp -a "${SRC_DISCORD_BOT_DIR}" "${DISCORD_BOT_DIR}"
+    # 设置 scripts 下的 .sh 可执行（若存在）
+    if [ -d "${CRON_SCRIPTS_DIR}" ]; then
+        chmod 644 "${DISCORD_BOT_SCRIPTS_DIR}"/* 2>/dev/null || true
+        chmod 755 "${DISCORD_BOT_SCRIPTS_DIR}"/*.sh 2>/dev/null || true        
+        chmod 644 "${DISCORD_BOT_DIR}"/SKILL.md 2>/dev/null || true        
     fi
 fi
 
