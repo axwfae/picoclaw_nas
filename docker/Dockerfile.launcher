@@ -59,7 +59,15 @@ COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/pico
 COPY docker/my_app /my_app
 
 #====================== https://github.com/jackccrawford/Clawmark/
+# 可由 docker build --platform=linux/amd64 或 --build-arg 传入
+
 RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4) \
+ && if [ -n "$TARGETARCH" ]; then ARCH="$TARGETARCH"; else ARCH="$(uname -m)"; fi; \
+ && case "$ARCH" in \
+    x86_64|amd64)  arch="amd64" ;; \
+    aarch64|arm64) arch="arm64" ;; \
+  esac; \
+ && NAME="linux-${arch}"; \
  && URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" \
  && curl -fsSL "$URL" -o "/tmp/clawmark.tar.gz" \
  && tar -xzf "/tmp/clawmark.tar.gz" -C /tmp \
