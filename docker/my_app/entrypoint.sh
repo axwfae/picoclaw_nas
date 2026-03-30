@@ -32,8 +32,8 @@ CLAWMARK_DIR="${WORKSPACE_DIR}/skills/clawmark"
 if [ ! -d "${CLAWMARK_DIR}" ]; then
     cp -a "${SRC_CLAWMARK_DIR}" "${CLAWMARK_DIR}"
 
-    chmod 755 "${CLAWMARK_DIR}/bin/*.*"
-    chmod 755 "${CLAWMARK_DIR}/lib/*.*"
+    chmod 755 "${CLAWMARK_DIR}/bin/"*
+    chmod 755 "${CLAWMARK_DIR}/lib/"*
     ln -sf "${CLAWMARK_DIR}/bin/clawmark" /usr/local/bin/clawmark
 fi
 #=======================================
