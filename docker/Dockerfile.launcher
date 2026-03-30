@@ -60,16 +60,15 @@ COPY docker/my_app /my_app
 
 #====================== https://github.com/jackccrawford/Clawmark/
 RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4); \
-    && echo "${LATEST}" ;
-
-#    && ARCH="$(uname -m)"; \
-#    && echo $ARCH ;\
-#    && case "$ARCH" in x86_64|amd64)  arch="amd64" ;; aarch64|arm64) arch="arm64" ;; esac; \
-#    && echo $arch ;\
-#    && NAME="linux-${arch}"; \
-#    && echo $NAME ;\
-#    && URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" ; \
-#    && echo $URL 
+    echo "${LATEST}"  ;\
+    ARCH="$(uname -m)" ;\
+    echo "${ARCH} ; \
+    case "$ARCH" in x86_64|amd64)  arch="amd64" ;; aarch64|arm64) arch="arm64" ;; esac; \
+    echo "${arch}" ; \
+    NAME="linux-${arch}"; \
+    echo "${NAME}" ;\
+    URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" ; \
+    echo "${URL}" 
 
 RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4) \
     && ARCH="$(uname -m)";\
