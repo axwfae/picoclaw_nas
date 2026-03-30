@@ -62,8 +62,8 @@ COPY docker/my_app /my_app
 RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4) 
 RUN ARCH="$(uname -m)"; 
 RUN case "$ARCH" in x86_64|amd64)  arch="amd64" ;; aarch64|arm64) arch="arm64" ;; esac; NAME="linux-${arch}"; 
-RUN URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" 
-RUN curl -fsSL "$URL" -o "/tmp/clawmark.tar.gz" \
+RUN URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" ; echo $URL
+RUN mkdir -p /tmp && curl -fsSL "$URL" -o "/tmp/clawmark.tar.gz" \
     && tar -xzf "/tmp/clawmark.tar.gz" -C /tmp \
     && rm "/tmp/clawmark.tar.gz"
   
