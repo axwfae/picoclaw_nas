@@ -34,7 +34,7 @@ if [ ! -d "${CLAWMARK_DIR}" ]; then
 
     chmod 755 "${CLAWMARK_DIR}\bin\*"
     chmod 755 "${CLAWMARK_DIR}\lib\*"
-    ln -sf ln "${CLAWMARK_DIR}\bin\clawmark" \usr\local\bin\clawmark
+    ln -sf "${CLAWMARK_DIR}\bin\clawmark" \usr\local\bin\clawmark
 fi
 #=======================================
 
