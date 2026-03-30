@@ -79,7 +79,7 @@ RUN mkdir -p /my_app/clawmark/bin  ;\
 
 RUN cp /tmp/clawmark /my_app/clawmark/bin/clawmark
 RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/lib/libonnxruntime.so.1
-RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/libonnxruntime.so
+RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/lib/libonnxruntime.so
 
 RUN chmod +x /my_app/entrypoint.sh
 
