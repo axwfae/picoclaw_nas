@@ -28,7 +28,7 @@ find /my_app -type f -name "*.sh" -exec chmod 755 {} +
 SRC_CLAWMARK_DIR="/my_app/clawmark"
 CLAWMARK_DIR="${WORKSPACE_DIR}/skills/clawmark"
 
-# 复制 discord-send（若不存在）
+# 复制 clawmark 若不存在）
 if [ ! -d "${SRC_CLAWMARK_DIR}" ]; then
     cp -a "${SRC_CLAWMARK_DIR}" "${CLAWMARK_DIR}"
 
