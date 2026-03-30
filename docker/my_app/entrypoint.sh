@@ -29,7 +29,7 @@ SRC_CLAWMARK_DIR="/my_app/clawmark"
 CLAWMARK_DIR="${WORKSPACE_DIR}/skills/clawmark"
 
 # 复制 clawmark 若不存在）
-if [ ! -d "${SRC_CLAWMARK_DIR}" ]; then
+if [ ! -d "${CLAWMARK_DIR}" ]; then
     cp -a "${SRC_CLAWMARK_DIR}" "${CLAWMARK_DIR}"
 
     chmod 755 "${CLAWMARK_DIR}\bin\*"
