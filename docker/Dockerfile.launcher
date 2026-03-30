@@ -59,7 +59,7 @@ COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/pico
 COPY docker/my_app /my_app
 
 #====================== https://github.com/jackccrawford/Clawmark/
-RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4); \
+RUN LATEST=$(curl -fsSL "https://api.github.com/repos/axwfae/clawmark_glib/releases/latest" | grep '"tag_name"' | cut -d'"' -f4); \
     echo "${LATEST}"  ;\
     ARCH="$(uname -m)" ;\
     echo "${ARCH}" ; \
