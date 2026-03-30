@@ -57,6 +57,21 @@ COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/pico
 #CMD ["-public", "-no-browser"]
 
 COPY docker/my_app /my_app
+
+#====================== https://github.com/jackccrawford/Clawmark/
+RUN LATEST=$(curl -fsSL "https://api.github.com/repos/jackccrawford/clawmark/releases/latest" | grep '"tag_name"' | cut -d'"' -f4) \
+ && URL="https://github.com/jackccrawford/clawmark/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" \
+ && curl -fsSL "$URL" -o "/tmp/clawmark.tar.gz" \
+ && tar -xzf "/tmp/clawmark.tar.gz" -C /tmp \
+ && rm "/tmp/clawmark.tar.gz"
+  
+RUN mkdir -p /my_app/clawmark/bin  \
+ && mkdir -p /my_app/clawmark/lib
+
+RUN cp /tmp/clawmark /my_app/clawmark/bin/clawmark
+RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/lib/libonnxruntime.so.1
+RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/libonnxruntime.so
+
 RUN chmod +x /my_app/entrypoint.sh
 
 ENTRYPOINT ["/my_app/entrypoint.sh"]
