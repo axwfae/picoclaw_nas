@@ -132,7 +132,7 @@ workspace/
 .picoclaw/
 └── workspace/
     └── memory/            # 所有 .md 文件
-        ├── notes.md
+        ├── MEMORY.md
         ├── 2024-01-01.md
         └── ...
 ```
