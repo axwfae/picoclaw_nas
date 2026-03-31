@@ -133,7 +133,7 @@ workspace/
 └── workspace/
     └── memory/            # 所有 .md 文件
         ├── MEMORY.md
-        ├── 2024-01-01.md
+        ├── 20240101.md
         └── ...
 ```
 
