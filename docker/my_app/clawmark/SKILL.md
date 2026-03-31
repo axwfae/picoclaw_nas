@@ -1,111 +1,150 @@
 ---
 name: clawmark
-description: "AI 編碼助手的信號式記憶系統。儲存學習到的解決方案，按意義搜尋，跨會話共享知識。"
-metadata: {"nanobot":{"emoji":"📡","requires":{"bins":["clawmark"]},"install":[{"id":"cargo","kind":"cargo","formula":"clawmark","label":"安裝 clawmark (cargo)"}]}}
+version: "0.2.1"
+description: AI 记忆信号系统 - 跨会话知识管理，让 AI 记住修复了什么、为什么坏掉、如何修复
+metadata: {"picoclaw":{"emoji":"📡","requires":{"bins":["bash","sqlite3","curl"]}}}
 ---
 
-# Clawmark 技能
+# clawmark - AI 记忆信号系统
 
-AI 編碼助手的信號式記憶系統。透過寫入信號儲存所學，透過調諧按意義尋找過往解決方案。
+> 你的下一个会话是冷启动。没有记忆你构建了什么、什么坏了、你决定了什么。每一个你写的信号都是给未来会话的礼物。信号越丰富，重新学习的时间就越少。
 
-## 為什麼要用 Clawmark
+支持任何框架 — OpenClaw、Claude Code、Aider、Cursor 或任何有 shell 访问的框架。
 
-一條寫著「修復 auth bug」的信號，無法為未來的自己節省時間。
+## 为什么这很重要
 
-一條寫著「什麼壞了、為什麼壞了、怎麼修復的」的信號，能節省一小時。
+一条写着"修好了 auth bug"的信号对你的未来毫无帮助。
 
-信號會累加。單一信號是筆記。一連串的信號是制度知識。為那個一無所知的未來自己而寫。
+一条写着什么坏了、为什么坏、怎么修好的信号能节省一小时。
+
+信号会累积。一个信号是笔记，一整站信号是制度性知识。为那个一无所知的未来的你而写。
 
 ## 命令
 
-### 儲存信號
-
 ```bash
-# 儲存完整細節（用 pipe 輸入深入內容）
+# 保存你学到的东西 — 管道输入详细内容，内联输入快速笔记
 echo "Token validation was running before refresh in auth.rs.
 Swapped lines 42-47. Root cause: middleware ordering assumed
 sync validation, but OAuth refresh is async. Three edge cases
 tested: expired token, revoked token, concurrent refresh." \
   | clawmark signal -c - -g "fix: auth token refresh — async ordering in middleware"
 
-# 快速信號（內聯）
+# 快速信号（不需要深度时）
 clawmark signal -c "Upgraded rusqlite to 0.32" -g "dep: rusqlite 0.32"
 
-# 從檔案讀取
+# 从文件创建信号
 clawmark signal -c @session-notes.md -g "session: March 19 architecture review"
 
-# 回覆現有信號
+# 线程化后续信号
 clawmark signal -c "Same fix needed in staging compose" -g "fix: staging auth ordering" -p A1B2C3D4
-```
 
-### 搜尋信號
-
-```bash
-# 語義搜尋（按意義）
+# 按语义搜索 — 不是关键词
 clawmark tune "authentication middleware"
 clawmark tune "what broke in production last week"
 
-# 關鍵字 fallback
+# 关键词回退
 clawmark tune --keyword "auth"
 
-# 最近的信號
+# 最近信号
 clawmark tune --recent
 
-# 完整內容（不只是 gist）
+# 完整内容（不只是 gist）
 clawmark tune --full "auth"
 
-# 隨機信號（發現遺忘的知識）
+# 发现你遗忘的东西
 clawmark tune --random
-```
 
-### 大量操作
-
-```bash
-# 載入現有檔案
+# 批量加载现有文件
 clawmark capture ./docs/
+
+# 从 OpenClaw 工作区导入
 clawmark capture --openclaw
 
-# 建立 embedding 快取（執行一次，之後自動）
+# 从 PicoClaw 工作区导入
+clawmark capture --picoclaw
+
+# 构建嵌入缓存（一次，之后自动）
 clawmark backfill
 
-# 站點統計
+# 站点统计
 clawmark status
 ```
 
-## 共享站點
+## 共享站点
 
-多個代理可以透過共享站點共享知識：
+多个 agent 可以写入同一个站点。一个 agent 学到的，每个 agent 都能找到。
 
 ```bash
-# 寫入共享站點
 CLAWMARK_STATION=/shared/team.db clawmark signal -c "Deploy complete" -g "ops: deploy v2.1"
-
-# 搜尋共享站點
 CLAWMARK_STATION=/shared/team.db clawmark tune "deploy"
 ```
 
-## 何時寫入信號
+## 何时发信号
 
-- **解決難題後** — 你的下一個會話會遇到同樣的問題。給它答案。
-- **會話結束前** — 上下文視窗中的一切都會隨會話結束而消失。你的站點不會。
-- **發現非顯而易見的事物時** — 小事實（設定旗標、行號、邊緣情況）最能節省時間。
+- **解决难题之后。** 你的下一个会话会遇到同样的问题。给它答案。
+- **会话结束之前。** 你上下文窗口中的所有内容都随着会话消亡。你的站点不会。
+- **发现非显而易见的东西时。** 小事实 — 哪个配置标志、哪行代码、哪个边缘情况 — 是节省最多时间的。
 
-## 何時調諧
+## 何时调谐 (tune)
 
-- **開始新任務時** — 你可能上週已經解決了一部分。
-- **卡住時** — 答案可能在你三個會話前寫的信號裡。
-- **壓縮之後** — 你的上下文被壓縮了。你的站點沒有。
+- **开始新任务时。** 你可能上周已经解决了部分。
+- **卡住时。** 答案可能在你三个会话前写的信号里。
+- **压缩之后。** 你的上下文被压缩了。你的站点没有。
 
-## 寫好信號的要點
+## 写好信号
 
-**摘要：** 壓縮洞見。`"fix: auth token refresh — async ordering in middleware"` — 類別、什麼、為何、何處。
+概要是你未来的自己如何找到这个信号。内容是找到后让它有用的东西。
 
-**內容：** 使其獨立自足。如果未來的自己只讀這條信號 — 沒有會話歷史、沒有周圍上下文 — 他們能理解發生了什麼並採取行動嗎？
+**概要：** 压缩洞察。`"fix: auth token refresh — async ordering in middleware"` — 类别、什么、为什么、在哪里。
 
-信號不需要很長。它需要完整。
+**内容：** 让它自包含。如果你未来的自己只读这个信号 — 没有会话历史、没有周围上下文 — 他们能理解发生了什么并采取行动吗？
 
-## 運作原理
+信号不需要长。它需要完整。
 
-信號儲存在 SQLite 資料庫中。語義搜尋使用本地 BERT 模型 — 無需 API 呼叫、無需雲端、完全離線運行。模型在首次搜尋時下載一次（約 118MB）。之後每條信號都會自動嵌入。
+## 工作原理
 
-搜尋按意義而非關鍵字找信號。「Authentication middleware」會匹配「token validation ordering」的信號，因為概念有重疊。
+信号生活在 SQLite 数据库中。语义搜索使用本地 BERT 模型 — 无 API 调用、无云、完全离线运行。模型在首次搜索时下载一次（~118MB）。之后的每个信号自动嵌入。
+
+搜索按含义而非关键词查找信号。"Authentication middleware" 匹配一个关于 "token validation ordering" 的信号，因为概念重叠。
+
+## 工作区适配器
+
+clawmark 支持从不同工作区格式导入：
+
+### OpenClaw
+
+路径：`~/.openclaw/workspace/`
+
+```
+workspace/
+├── MEMORY.md              # 长期记忆
+├── memory/                # 每日日志
+│   ├── 2024-01-01.md
+│   └── 2024-01-02.md
+└── AGENTS.md              # Agent 定义（可选）
+```
+
+### PicoClaw
+
+路径：`~/.picoclaw/workspace/memory/`
+
+```
+.picoclaw/
+└── workspace/
+    └── memory/            # 所有 .md 文件
+        ├── notes.md
+        ├── 2024-01-01.md
+        └── ...
+```
+
+两个适配器都会扫描各自的目录并导入所有 markdown 文件作为信号。使用 `--openclaw` 或 `--picoclaw` 指定要导入的工作区。
+
+---
+
+## 版本历史 / Changelog
+
+### v0.2.1 (2026-03-31)
+- 🔧 转换为 picoclaw 格式，添加 frontmatter
+
+### v0.2.0
+- 初始发布
