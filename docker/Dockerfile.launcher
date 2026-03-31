@@ -74,12 +74,11 @@ RUN LATEST=$(curl -fsSL "https://api.github.com/repos/axwfae/clawmark_glib/relea
     tar -xzf "/tmp/clawmark.tar.gz" -C /tmp ;\
     rm "/tmp/clawmark.tar.gz"
   
-RUN mkdir -p /my_app/clawmark/bin  ;\
-    mkdir -p /my_app/clawmark/lib
+RUN mkdir -p /my_app/clawmark/bin/lib
 
 RUN cp /tmp/clawmark /my_app/clawmark/bin/clawmark
-RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/lib/libonnxruntime.so.1
-RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/lib/libonnxruntime.so
+RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/lib/libonnxruntime.so.1
+RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/lib/libonnxruntime.so
 
 RUN chmod +x /my_app/entrypoint.sh
 
