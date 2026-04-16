@@ -58,28 +58,6 @@ RUN chmod 755 /usr/local/bin/picoclaw*
 
 COPY docker/my_app /my_app
 
-#====================== https://github.com/jackccrawford/Clawmark/
-RUN LATEST=$(curl -fsSL "https://api.github.com/repos/axwfae/clawmark_glib/releases/latest" | grep '"tag_name"' | cut -d'"' -f4); \
-    echo "${LATEST}"  ;\
-    ARCH="$(uname -m)" ;\
-    echo "${ARCH}" ; \
-    case "$ARCH" in x86_64|amd64)  arch="amd64" ;; aarch64|arm64) arch="arm64" ;; esac; \
-    echo "${arch}" ; \
-    NAME="linux-${arch}"; \
-    echo "${NAME}" ;\
-    URL="https://github.com/axwfae/clawmark_glib/releases/download/${LATEST}/clawmark-${NAME}.tar.gz" ; \
-    echo "${URL}" ;\
-    mkdir -p /tmp ;\
-    curl -fsSL "${URL}" -o "/tmp/clawmark.tar.gz" ;\
-    tar -xzf "/tmp/clawmark.tar.gz" -C /tmp ;\
-    rm "/tmp/clawmark.tar.gz"
-  
-RUN mkdir -p /my_app/clawmark/bin/lib
-
-RUN cp /tmp/clawmark /my_app/clawmark/bin/clawmark
-RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/lib/libonnxruntime.so.1
-RUN cp /tmp/libonnxruntime.so.1.22.0 /my_app/clawmark/bin/lib/libonnxruntime.so
-
 RUN chmod +x /my_app/entrypoint.sh
 
 # Create non-root user and group
