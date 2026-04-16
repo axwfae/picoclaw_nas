@@ -29,19 +29,19 @@ sudo rm -rf "${WORKSPACE_DIR}/tmp"
 mkdir "${WORKSPACE_DIR}/tmp"
 
 #=======================================
-SRC_CLAWMARK_DIR="/my_app/clawmark"
-CLAWMARK_DIR="${WORKSPACE_DIR}/skills/clawmark"
+SRC_CLAWLCM_DIR="/my_app/clawlcm"
+CLAWLCM_DIR="${WORKSPACE_DIR}/skills/clawlcm"
 
-# 复制 clawmark 若不存在）
-if [ ! -d "${CLAWMARK_DIR}" ]; then
+# 复制 clawlcm 若不存在）
+if [ ! -d "${CLAWLCM_DIR}" ]; then
     sudo chmod -R 644 /my_app  
     sudo find /my_app -type d -exec chmod 755 {} +
     sudo find /my_app -type f -name "*.sh" -exec chmod 755 {} +
 
-    cp -a "${SRC_CLAWMARK_DIR}" "${CLAWMARK_DIR}"
+    cp -a "${SRC_CLAWLCM_DIR}" "${CLAWLCM_DIR}"
 
-    sudo chmod -R 755 "${CLAWMARK_DIR}/bin/"*
-    sudo ln -sf "${CLAWMARK_DIR}/bin/clawmark" /usr/local/bin/clawmark
+    sudo chmod -R 755 "${CLAWLCM_DIR}/bin/"*
+    sudo ln -sf "${CLAWLCM_DIR}/bin/clawlcm" /usr/local/bin/clawlcm
 fi
 #=======================================
 
