@@ -33,7 +33,40 @@
 
 # 檔案管理規範（強制）
 
-## 1. 執行檔案 → `workspace/run_cmd/` 目錄
+## 0. 檔案權限規範
+
+為了解決跨設備檔案存取的權限問題，未來所有新建立的檔案必須遵循以下權限規則：
+
+| 檔案類型 | 權限 | 說明 |
+|----------|------|------|
+| 執行檔案（.sh, 腳本等） | `777` | 可執行腳本 |
+| 一般檔案（.md, .txt, .json 等） | `666` | 可讀寫，不可執行 |
+
+```bash
+# 建立執行檔案後，务必設定權限
+chmod 777 run_cmd/<script>.sh
+
+# 其他檔案設定為 666
+chmod 666 <檔案>
+
+```
+- 這是為了統一管理文件資料，避免與執行檔案、暫時資料混淆
+- 建立檔案後需設定權限為 `666`
+
+
+> ⚠️ **重要**：在建立任何新檔案後，請立即設定正確的權限，確保跨設備（如 NAS）存取時不會出現權限不足的問題。
+
+
+## 1. 文件資料 → `workspace/docs/` 目錄
+
+所有創建的**文件資料**（報告、文章、筆記、文件等），**必須**放置在 `docs` 目錄中。
+
+```bash
+# 使用前先確保目錄存在
+[ ! -d "docs" ] && mkdir -p "docs"
+```
+
+## 2. 執行檔案 → `workspace/run_cmd/` 目錄
 
 為了工作需求或 skill 調用所產生的**執行檔案**（如 `.sh` 腳本、腳本化命令等），**必須**放置在 `run_cmd` 目錄中。
 
@@ -44,10 +77,9 @@
 
 - **禁止**將執行檔案放置在其他位置（如 workspace 根目錄、skills 目錄等）
 - 這是為了統一管理執行命令，避免工作目錄混亂
-- 執行前需設定權限：`chmod +x run_cmd/<script>.sh`
+- 建立後需設定權限：`chmod 777 run_cmd/<script>.sh`
 
-
-## 2. 暫時性資料 → `workspace/tmp/` 目錄
+## 3. 暫時性資料 → `workspace/tmp/` 目錄
 
 所有產生的暫時性資料（如待處理的 txt 文件、臨時計算結果、過渡性檔案等），**必須**先放置在 `tmp` 目錄中。
 
@@ -59,7 +91,7 @@
 - 若無特殊需求，處理完畢後應考慮刪除
 - 不要將 tmp 目錄的檔案視為永久保存
 
-## 3. 下載資料 → `workspace/download/` 目錄
+## 4. 下載資料 → `workspace/download/` 目錄
 
 所有要求下載的資料（網頁、音樂、文件等），**必須**放置在 `download` 目錄中。
 
@@ -70,15 +102,15 @@
 [ ! -d "download" ] && mkdir -p "download"
 ```
 
-### 3. 頻道/軟件來源分類 → `download/{頻道名}/`
+### 5. 頻道/軟件來源分類 → `download/{頻道名}/`
 
 | 頻道/軟件 | 目錄 |
 |-----------|------|
-| Discord | `workspace/download/discord/` |
-| WeChat/微信 | `workspace/download/weixin/` |
-| Telegram | `workspace/download/telegram/` |
-| Email | `workspace/download/email/` |
-| 其他 | `workspace/download/others/` |
+| Discord | `download/discord/` |
+| WeChat/微信 | `download/weixin/` |
+| Telegram | `download/telegram/` |
+| Email | `download/email/` |
+| 其他 | `download/others/` |
 
 **例外：** 若該頻道或軟件本身有指定的儲存位置要求，則遵照其要求執行。
 
