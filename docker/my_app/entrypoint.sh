@@ -88,7 +88,7 @@ fi
 sudo service cron start 
 #=======================================
 
-picoclaw-token-proxy -config "${PICOPATH}/.security.yml" -pid "${PICOPATH}/.picoclaw.pid"  &
+picoclaw-token-proxy &
 
 # 启动主进程（确保可执行在 PATH 中）
 exec picoclaw-launcher -public -no-browser
