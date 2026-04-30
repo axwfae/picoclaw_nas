@@ -80,7 +80,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.launcher
+          file: docker/Dockerfile_debian.launcher
           push: true
           tags: ${{ steps.tags.outputs.tags_list }}
           build-args: |
