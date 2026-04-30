@@ -49,7 +49,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Copy binaries from builder
 COPY --from=docker_base /usr/local/bin/picoclaw              /usr/local/bin/picoclaw
 COPY --from=docker_base /usr/local/bin/picoclaw-launcher     /usr/local/bin/picoclaw-launcher
-COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/picoclaw-launcher-tui
+#COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/picoclaw-launcher-tui
 
 # Copy binaries from token docker
 COPY --from=tokenproxy_base /app/picoclaw-token-proxy        /usr/local/bin/picoclaw-token-proxy
