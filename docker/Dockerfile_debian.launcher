@@ -1,0 +1,78 @@
+# ============================================================
+# Stage 2: Build for https://github.com/sipeed/picoclaw
+# ============================================================
+ARG BASE_TAG=launcher
+FROM sipeed/picoclaw:${BASE_TAG} AS docker_base
+
+# ============================================================
+# Stage x: add token proxy for https://github.com/sipeed/picoclaw
+# ============================================================
+FROM wuyong1977/picoclaw_token_proxy:latest AS tokenproxy_base
+
+# ============================================================
+# Stage 3: Runtime image
+# ============================================================
+FROM debian:bookworm-slim
+
+# ============================================================
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    sudo \
+    nano \
+    ca-certificates \
+    tzdata \
+    zip \
+    unzip \
+    curl \
+    wget
+
+# ============================================================
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    procps \
+    cron \
+    jq
+
+# ============================================================
+#RUN apt-get install -y --no-install-recommends \
+#    git \
+#    python3 \
+#    python3-pip
+
+# ============================================================
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -q --spider http://localhost:18790/health || exit 1
+
+# Copy binaries from builder
+COPY --from=docker_base /usr/local/bin/picoclaw              /usr/local/bin/picoclaw
+COPY --from=docker_base /usr/local/bin/picoclaw-launcher     /usr/local/bin/picoclaw-launcher
+#COPY --from=docker_base /usr/local/bin/picoclaw-launcher-tui /usr/local/bin/picoclaw-launcher-tui
+
+# Copy binaries from token docker
+COPY --from=tokenproxy_base /app/picoclaw-token-proxy        /usr/local/bin/picoclaw-token-proxy
+
+RUN chmod 755 /usr/local/bin/picoclaw*
+
+COPY docker/my_app /my_app
+
+RUN chmod +x /my_app/entrypoint.sh
+
+# Create non-root user and group
+RUN groupadd -g 1000 picoclaw && \
+    useradd -m -u 1000 -g picoclaw picoclaw
+
+# 允許 picoclaw 使用 sudo 不需密碼
+RUN echo 'picoclaw ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/picoclaw \
+ && chmod 0440 /etc/sudoers.d/picoclaw
+
+RUN chown -R picoclaw:picoclaw /my_app
+RUN chown picoclaw:picoclaw /usr/local/bin/picoclaw*
+
+# Switch to non-root user
+USER picoclaw
+
+# Default to launcher mode (web console + gateway)
+ENTRYPOINT ["/my_app/entrypoint.sh"]
